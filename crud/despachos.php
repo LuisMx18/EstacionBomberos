@@ -2,6 +2,7 @@
 $pageTitle = "Despacho de Servicios";
 require_once "../config/conexion.php";
 require_once "../includes/auth.php";
+require_modulo('despachos');
 require_once "../includes/header.php";
 
 $despachos = mysqli_query(

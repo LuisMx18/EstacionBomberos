@@ -2,117 +2,77 @@
 $pageTitle = "Registrar Servicio";
 require_once "../config/conexion.php";
 require_once "../includes/auth.php";
+require_modulo('servicios');
+validar_csrf();
 
-// Obtener unidades para el select
-$unidades = mysqli_query($con, "SELECT id, nombre FROM unidades ORDER BY nombre ASC");
+$unidades = $con->query("SELECT id, nombre FROM unidades ORDER BY nombre ASC");
 
-// Procesar envío
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fecha_servicio   = $_POST['fecha_servicio'];
-    $hora_reporte     = $_POST['hora_reporte'] ?: date('H:i:s');
-    $hora_salida      = $_POST['hora_salida'] ?: date('H:i:s');
-    $hora_llegada     = $_POST['hora_llegada'] ?: null;
-    $hora_regreso     = $_POST['hora_regreso'] ?: null;
+    $fecha_servicio   = trim($_POST['fecha_servicio'] ?? '');
+    $hora_reporte     = trim($_POST['hora_reporte']   ?? '') ?: date('H:i:s');
+    $hora_salida      = trim($_POST['hora_salida']    ?? '') ?: date('H:i:s');
+    $hora_llegada     = trim($_POST['hora_llegada']   ?? '') ?: null;
+    $hora_regreso     = trim($_POST['hora_regreso']   ?? '') ?: null;
+    $nombre_reporta   = trim($_POST['nombre_reporta']   ?? '');
+    $telefono_reporta = trim($_POST['telefono_reporta'] ?? '');
+    $unidad_id        = (int)($_POST['unidad_id']  ?? 0);
+    $mando            = trim($_POST['mando']        ?? '');
+    $bomberos         = (int)($_POST['bomberos']    ?? 1);
+    $lesionados       = (int)($_POST['lesionados']  ?? 0);
+    $fallecidos       = (int)($_POST['fallecidos']  ?? 0);
+    $danios           = trim($_POST['danios']        ?? '');
+    $descripcion      = trim($_POST['descripcion']   ?? '');
+    $tipo_incidente   = trim($_POST['tipo_incidente']?? '');
+    $prioridad        = trim($_POST['prioridad']     ?? '');
+    $condiciones      = trim($_POST['condiciones']   ?? '');
+    $turno_numero     = (int)($_POST['turno_numero'] ?? 1);
+    $calle            = trim($_POST['calle']         ?? '');
+    $cruce            = trim($_POST['cruce']         ?? '');
+    $colonia          = trim($_POST['colonia']       ?? '');
+    $municipio        = trim($_POST['municipio']     ?? '');
+    $despachador      = trim($_POST['despachador']   ?? '');
+    $responsable_rep  = trim($_POST['responsable_reporte'] ?? '');
+    $observaciones    = trim($_POST['observaciones'] ?? '');
+    $tiempo_motobomba = (int)($_POST['tiempo_motobomba'] ?? 0);
+    $litros_agua      = (int)($_POST['litros_agua']      ?? 0);
+    $kilometraje      = (int)($_POST['kilometraje']      ?? 0);
+    $nivel_combustible= trim($_POST['nivel_combustible'] ?? '');
+    $acciones         = trim($_POST['acciones']          ?? '');
 
-    $nombre_reporta   = mysqli_real_escape_string($con, $_POST['nombre_reporta']);
-    $telefono_reporta = mysqli_real_escape_string($con, $_POST['telefono_reporta']);
+    $stmt = $con->prepare("INSERT INTO servicios (
+        fecha_servicio, hora_reporte, hora_salida, hora_llegada, hora_regreso,
+        nombre_reporta, telefono_reporta,
+        unidad_id, mando, bomberos,
+        lesionados, fallecidos, danios,
+        descripcion, tipo_incidente, prioridad, condiciones,
+        turno_numero, calle, cruce, colonia, municipio,
+        despachador, responsable_reporte, observaciones,
+        tiempo_motobomba, litros_agua, kilometraje, nivel_combustible, acciones
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    $unidad_id        = (int) $_POST['unidad_id'];
-    $mando            = mysqli_real_escape_string($con, $_POST['mando']);
-    $bomberos         = (int) $_POST['bomberos'];
+    // type: 7s + i + s + 3i + 5s + i + 7s + 3i + 2s = 30
+    $stmt->bind_param("sssssssisiiisssssisssssssiiiiss",
+        $fecha_servicio, $hora_reporte, $hora_salida, $hora_llegada, $hora_regreso,
+        $nombre_reporta, $telefono_reporta,
+        $unidad_id, $mando, $bomberos,
+        $lesionados, $fallecidos, $danios,
+        $descripcion, $tipo_incidente, $prioridad, $condiciones,
+        $turno_numero, $calle, $cruce, $colonia, $municipio,
+        $despachador, $responsable_rep, $observaciones,
+        $tiempo_motobomba, $litros_agua, $kilometraje, $nivel_combustible, $acciones
+    );
+    $stmt->execute();
+    $servicio_id = $con->insert_id;
+    $stmt->close();
 
-    $descripcion      = mysqli_real_escape_string($con, $_POST['descripcion']);
-    $turno_numero     = (int) $_POST['turno_numero'];
+    // Registro inicial de combustible (isssis = i:serv_id, s:h_sal, s:h_reg, s:desc, i:km, s:nivel)
+    $desc_init = 'Registro inicial desde servicio';
+    $stmtC = $con->prepare("INSERT INTO combustible (servicio_id, hora_salida, hora_regreso, descripcion, kilometraje, nivel_combustible) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmtC->bind_param("isssis", $servicio_id, $hora_salida, $hora_regreso, $desc_init, $kilometraje, $nivel_combustible);
+    $stmtC->execute();
+    $stmtC->close();
 
-    $calle            = mysqli_real_escape_string($con, $_POST['calle']);
-    $cruce            = mysqli_real_escape_string($con, $_POST['cruce']);
-    $colonia          = mysqli_real_escape_string($con, $_POST['colonia']);
-    $municipio        = mysqli_real_escape_string($con, $_POST['municipio']);
-
-    $despachador      = mysqli_real_escape_string($con, $_POST['despachador']);
-    $tiempo_motobomba = (int) $_POST['tiempo_motobomba'];
-    $litros_agua      = (int) $_POST['litros_agua'];
-
-    $kilometraje      = (int) $_POST['kilometraje'];
-    $nivel_combustible = mysqli_real_escape_string($con, $_POST['nivel_combustible']);
-
-    // Nuevos campos
-    $tipo_incidente   = mysqli_real_escape_string($con, $_POST['tipo_incidente'] ?? '');
-    $prioridad        = mysqli_real_escape_string($con, $_POST['prioridad'] ?? '');
-    $condiciones      = mysqli_real_escape_string($con, $_POST['condiciones'] ?? '');
-
-    $lesionados       = (int) ($_POST['lesionados'] ?? 0);
-    $fallecidos       = (int) ($_POST['fallecidos'] ?? 0);
-    $danios           = mysqli_real_escape_string($con, $_POST['danios'] ?? '');
-
-    $acciones         = mysqli_real_escape_string($con, $_POST['acciones'] ?? '');
-    $responsable_rep  = mysqli_real_escape_string($con, $_POST['responsable_reporte'] ?? '');
-    $observaciones    = mysqli_real_escape_string($con, $_POST['observaciones'] ?? '');
-
-    // Inserta en servicios
-    $sql = "INSERT INTO servicios (
-                fecha_servicio, hora_reporte, hora_salida, hora_llegada, hora_regreso,
-                nombre_reporta, telefono_reporta,
-                unidad_id, mando, bomberos,
-                lesionados, fallecidos, danios,
-                descripcion, tipo_incidente, prioridad, condiciones,
-                turno_numero,
-                calle, cruce, colonia, municipio,
-                despachador, responsable_reporte, observaciones,
-                tiempo_motobomba, litros_agua,
-                kilometraje, nivel_combustible,
-                acciones
-            ) VALUES (
-                '$fecha_servicio',
-                '$hora_reporte',
-                '$hora_salida',
-                " . ($hora_llegada ? "'$hora_llegada'" : "NULL") . ",
-                " . ($hora_regreso ? "'$hora_regreso'" : "NULL") . ",
-                '$nombre_reporta',
-                '$telefono_reporta',
-                $unidad_id,
-                '$mando',
-                $bomberos,
-                $lesionados,
-                $fallecidos,
-                '$danios',
-                '$descripcion',
-                '$tipo_incidente',
-                '$prioridad',
-                '$condiciones',
-                $turno_numero,
-                '$calle',
-                '$cruce',
-                '$colonia',
-                '$municipio',
-                '$despachador',
-                '$responsable_rep',
-                '$observaciones',
-                $tiempo_motobomba,
-                $litros_agua,
-                $kilometraje,
-                '$nivel_combustible',
-                '$acciones'
-            )";
-
-    mysqli_query($con, $sql);
-    $servicio_id = mysqli_insert_id($con);
-
-    // Opcional: registro inicial de combustible ligado al servicio
-    $hora_salida_comb = $hora_salida;
-    $sqlComb = "INSERT INTO combustible (
-                    servicio_id, hora_salida, hora_regreso,
-                    descripcion, kilometraje, nivel_combustible
-                ) VALUES (
-                    $servicio_id,
-                    '$hora_salida_comb',
-                    " . ($hora_regreso ? "'$hora_regreso'" : "NULL") . ",
-                    'Registro inicial desde servicio',
-                    $kilometraje,
-                    '$nivel_combustible'
-                )";
-    mysqli_query($con, $sqlComb);
-
+    set_flash('success', 'Servicio registrado correctamente.');
     header("Location: servicios.php");
     exit;
 }
@@ -198,6 +158,7 @@ require_once "../includes/header.php";
         </div>
 
         <form method="post" class="row g-3">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
             <!-- Datos de corporación -->
             <div class="col-12 mb-2">
                 <h5 class="text-uppercase small text-danger fw-bold mb-2">

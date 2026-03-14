@@ -1,6 +1,8 @@
 <?php
 require_once "../config/conexion.php";
 require_once "../includes/auth.php";
+// Acceso: solo roles con permiso de reportes
+if (!puede_acceder('reportes')) { http_response_code(403); die("Acceso denegado."); }
 
 require_once __DIR__ . "/../vendor/dompdf/autoload.inc.php";
 

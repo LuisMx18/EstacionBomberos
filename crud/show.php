@@ -2,6 +2,7 @@
 $pageTitle = "Ficha de Bombero";
 require_once "../config/conexion.php";
 require_once "../includes/auth.php";
+require_modulo('bomberos');
 
 if (!isset($_GET['id'])) {
     header("Location: index.php");
@@ -9,8 +10,11 @@ if (!isset($_GET['id'])) {
 }
 
 $id = (int) $_GET['id'];
-$res = mysqli_query($con, "SELECT * FROM bomberos WHERE id = $id");
-$b = mysqli_fetch_assoc($res);
+$stmt = $con->prepare("SELECT * FROM bomberos WHERE id = ? LIMIT 1");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$b = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 if (!$b) {
     header("Location: index.php");

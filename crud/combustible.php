@@ -2,6 +2,7 @@
 $pageTitle = "Control de Combustible";
 require_once "../config/conexion.php";
 require_once "../includes/auth.php";
+require_modulo('combustible');
 require_once "../includes/header.php";
 
 $sql = "
