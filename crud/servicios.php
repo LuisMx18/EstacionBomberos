@@ -2,6 +2,7 @@
 $pageTitle = "Servicios";
 require_once "../config/conexion.php";
 require_once "../includes/auth.php";
+require_modulo('servicios');
 require_once "../includes/header.php";
 
 $servicios = mysqli_query(

@@ -2,75 +2,66 @@
 $pageTitle = "Lista de Asistencia";
 require_once "../config/conexion.php";
 require_once "../includes/auth.php";
-require_once "../includes/header.php";
+require_modulo('asistencia');
+validar_csrf();
 
 date_default_timezone_set('America/Monterrey');
 
-// Fecha seleccionada (para filtrar registros)
 $fecha_seleccionada = isset($_GET['fecha']) ? $_GET['fecha'] : date('Y-m-d');
 
 // Registrar asistencia (entrada)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bombero_id'])) {
-    $bombero_id    = (int) $_POST['bombero_id'];
-    $fecha         = $_POST['fecha'] ?: date('Y-m-d');
-    $turno_inicio  = $_POST['turno_inicio'];  // ej: 08:00:00
-    $turno_fin     = $_POST['turno_fin'];     // ej: 20:00:00
-    $hora_actual   = date('H:i:s');
-    $hora_entrada  = $hora_actual;
-    $hora_salida   = null;
+    $bombero_id   = (int)$_POST['bombero_id'];
+    $fecha        = $_POST['fecha'] ?: date('Y-m-d');
+    $turno_inicio = $_POST['turno_inicio'];
+    $turno_fin    = $_POST['turno_fin'];
+    $hora_actual  = date('H:i:s');
 
-    // obtener horas mínimas de turno del bombero
-    $resBom = mysqli_query($con, "SELECT horas_turno_minimo FROM bomberos WHERE id = $bombero_id LIMIT 1");
-    $rowBom = mysqli_fetch_assoc($resBom);
+    // Obtener horas mínimas del bombero
+    $stmtB = $con->prepare("SELECT horas_turno_minimo FROM bomberos WHERE id = ? LIMIT 1");
+    $stmtB->bind_param("i", $bombero_id);
+    $stmtB->execute();
+    $rowBom    = $stmtB->get_result()->fetch_assoc();
+    $stmtB->close();
     $horas_min = (int)($rowBom['horas_turno_minimo'] ?? 8);
 
-    // Determinar si llegó tarde: si hora_entrada > turno_inicio
-    $llego_tarde = (strtotime($hora_entrada) > strtotime($turno_inicio)) ? 1 : 0;
+    $llego_tarde = (strtotime($hora_actual) > strtotime($turno_inicio)) ? 1 : 0;
 
-    // Evitar duplicado de entrada para mismo bombero y fecha
-    $check = mysqli_query(
-        $con,
-        "SELECT id FROM asistencias 
-         WHERE bombero_id = $bombero_id AND fecha = '$fecha'"
-    );
+    // Evitar duplicado
+    $stmtC = $con->prepare("SELECT id FROM asistencias WHERE bombero_id = ? AND fecha = ? LIMIT 1");
+    $stmtC->bind_param("is", $bombero_id, $fecha);
+    $stmtC->execute();
+    $stmtC->store_result();
+    $existe = $stmtC->num_rows;
+    $stmtC->close();
 
-    if (mysqli_num_rows($check) == 0) {
-        $sql = "INSERT INTO asistencias (
-                    bombero_id, fecha, hora_entrada, hora_salida,
-                    horas_turno, llego_tarde, hora_registro,
-                    turno_inicio, turno_fin,
-                    horas_turno_minimo
-                ) VALUES (
-                    $bombero_id,
-                    '$fecha',
-                    '$hora_entrada',
-                    NULL,
-                    NULL,
-                    $llego_tarde,
-                    '$hora_actual',
-                    '$turno_inicio',
-                    '$turno_fin',
-                    $horas_min
-                )";
-        mysqli_query($con, $sql);
+    if ($existe == 0) {
+        $stmtIns = $con->prepare("INSERT INTO asistencias (
+            bombero_id, fecha, hora_entrada, hora_salida,
+            horas_turno, llego_tarde, hora_registro,
+            turno_inicio, turno_fin, horas_turno_minimo
+        ) VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)");
+        $stmtIns->bind_param("issiissi",
+            $bombero_id, $fecha, $hora_actual,
+            $llego_tarde, $hora_actual,
+            $turno_inicio, $turno_fin, $horas_min);
+        $stmtIns->execute();
+        $stmtIns->close();
     }
 
     header("Location: asistencia.php?fecha=" . urlencode($fecha));
     exit;
 }
 
-// Obtener bomberos para selector
-$bomberos = mysqli_query($con, "SELECT id, nombre, puesto FROM bomberos ORDER BY nombre ASC");
+// Queries para display (DESPUÉS del POST processing)
+$bomberos    = $con->query("SELECT id, nombre, puesto FROM bomberos ORDER BY nombre ASC");
+$stmtAs      = $con->prepare("SELECT a.*, b.nombre, b.puesto FROM asistencias a INNER JOIN bomberos b ON b.id = a.bombero_id WHERE a.fecha = ? ORDER BY a.hora_entrada ASC");
+$stmtAs->bind_param("s", $fecha_seleccionada);
+$stmtAs->execute();
+$asistencias = $stmtAs->get_result();
+$stmtAs->close();
 
-// Obtener asistencias por fecha seleccionada
-$asistencias = mysqli_query(
-    $con,
-    "SELECT a.*, b.nombre, b.puesto
-     FROM asistencias a
-     INNER JOIN bomberos b ON b.id = a.bombero_id
-     WHERE a.fecha = '$fecha_seleccionada'
-     ORDER BY a.hora_entrada ASC"
-);
+require_once "../includes/header.php";
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-3 page-title">
@@ -156,6 +147,7 @@ $bomberos = mysqli_query($con, "SELECT id, nombre, puesto FROM bomberos ORDER BY
     </div>
     <div class="card-body">
         <form method="post" class="row g-3">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
             <input type="hidden" name="fecha" value="<?php echo htmlspecialchars($fecha_seleccionada); ?>">
 
             <div class="col-md-4">

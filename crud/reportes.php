@@ -2,6 +2,7 @@
 $pageTitle = "Reportes";
 require_once "../config/conexion.php";
 require_once "../includes/auth.php";
+require_modulo('reportes');
 require_once "../includes/header.php";
 
 date_default_timezone_set('America/Monterrey');

@@ -2,9 +2,7 @@
 $pageTitle = "Asistencia por RFID";
 require_once "../config/conexion.php";
 require_once "../includes/auth.php";
-require_once "../includes/header.php";
-
-use Dompdf\Dompdf; // ignorar si no usas dompdf aquí
+require_modulo('asistencia_rfid');
 
 date_default_timezone_set('America/Monterrey');
 
@@ -13,137 +11,96 @@ $tipo_alerta = "info";
 $detalle = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rfid'])) {
-    $rfid = mysqli_real_escape_string($con, trim($_POST['rfid']));
+    $rfid      = trim($_POST['rfid'] ?? '');
     $fecha_hoy = date('Y-m-d');
     $hora_now  = date('H:i:s');
 
-    // traer bombero con su mínimo de horas
-    $q = mysqli_query(
-        $con,
-        "SELECT id, nombre, horas_turno_minimo
-         FROM bomberos 
-         WHERE rfid_codigo = '$rfid'
-         LIMIT 1"
-    );
+    // Buscar bombero por RFID
+    $stmtB = $con->prepare("SELECT id, nombre, horas_turno_minimo FROM bomberos WHERE rfid_codigo = ? LIMIT 1");
+    $stmtB->bind_param("s", $rfid);
+    $stmtB->execute();
+    $bombero = $stmtB->get_result()->fetch_assoc();
+    $stmtB->close();
 
-    if ($bombero = mysqli_fetch_assoc($q)) {
-        $bombero_id = (int) $bombero['id'];
+    if ($bombero) {
+        $bombero_id      = (int)$bombero['id'];
         $min_horas_turno = (int)($bombero['horas_turno_minimo'] ?? 8);
 
-        // buscar registro de asistencia del día
-        $res = mysqli_query(
-            $con,
-            "SELECT * FROM asistencias
-             WHERE bombero_id = $bombero_id
-               AND fecha = '$fecha_hoy'
-             LIMIT 1"
-        );
+        // Buscar asistencia del día
+        $stmtA = $con->prepare("SELECT * FROM asistencias WHERE bombero_id = ? AND fecha = ? LIMIT 1");
+        $stmtA->bind_param("is", $bombero_id, $fecha_hoy);
+        $stmtA->execute();
+        $resA = $stmtA->get_result();
+        $existe = $resA->num_rows;
+        $asis   = $resA->fetch_assoc();
+        $stmtA->close();
 
-        if (mysqli_num_rows($res) == 0) {
+        if ($existe == 0) {
             // PRIMERA PASADA -> ENTRADA
-            mysqli_query(
-                $con,
-                "INSERT INTO asistencias (
-                    bombero_id, fecha,
-                    hora_entrada, hora_salida,
-                    horas_turno, llego_tarde,
-                    hora_registro, turno_inicio, turno_fin,
-                    horas_turno_minimo
-                ) VALUES (
-                    $bombero_id,
-                    '$fecha_hoy',
-                    '$hora_now',
-                    NULL,
-                    NULL,
-                    0,
-                    '$hora_now',
-                    NULL,
-                    NULL,
-                    $min_horas_turno
-                )"
-            );
+            $stmtIns = $con->prepare("INSERT INTO asistencias (
+                bombero_id, fecha, hora_entrada, hora_salida,
+                horas_turno, llego_tarde, hora_registro,
+                turno_inicio, turno_fin, horas_turno_minimo
+            ) VALUES (?, ?, ?, NULL, NULL, 0, ?, NULL, NULL, ?)");
+            $stmtIns->bind_param("isssi", $bombero_id, $fecha_hoy, $hora_now, $hora_now, $min_horas_turno);
+            $stmtIns->execute();
+            $stmtIns->close();
 
-            $mensaje = "ENTRADA registrada para: " . $bombero['nombre'];
+            $mensaje     = "ENTRADA registrada para: " . $bombero['nombre'];
             $tipo_alerta = "success";
-            $detalle = "Mínimo: {$min_horas_turno} h | Hora de entrada: " . substr($hora_now, 0, 5);
+            $detalle     = "Mínimo: {$min_horas_turno} h | Hora de entrada: " . substr($hora_now, 0, 5);
 
         } else {
-            // YA HAY REGISTRO
-            $asis = mysqli_fetch_assoc($res);
-            $id_asistencia = (int) $asis['id'];
-            $hora_entrada = $asis['hora_entrada'];
-
-            // si en la asistencia no hubiera valor, toma el actual del bombero
+            $id_asistencia   = (int)$asis['id'];
+            $hora_entrada    = $asis['hora_entrada'];
             $min_horas_turno = (int)($asis['horas_turno_minimo'] ?? $min_horas_turno);
 
             if (is_null($asis['hora_salida'])) {
                 // SEGUNDA PASADA -> SALIDA
                 $seg_entrada = strtotime($hora_entrada);
                 $seg_salida  = strtotime($hora_now);
-
-                // Si cruzan medianoche
                 if ($seg_salida < $seg_entrada) {
                     $seg_salida += 24 * 3600;
                 }
-
                 $horas_diferencia = ($seg_salida - $seg_entrada) / 3600;
-                $horas_red = round($horas_diferencia, 2);
+                $horas_red        = round($horas_diferencia, 2);
+                $extras           = $horas_diferencia > $min_horas_turno
+                    ? round($horas_diferencia - $min_horas_turno, 2) : 0;
 
-                $extras = 0;
-                if ($horas_diferencia > $min_horas_turno) {
-                    $extras = round($horas_diferencia - $min_horas_turno, 2);
-                }
-
-                mysqli_query(
-                    $con,
-                    "UPDATE asistencias
-                     SET hora_salida = '$hora_now',
-                         horas_turno = $horas_red,
-                         horas_turno_minimo = $min_horas_turno
-                     WHERE id = $id_asistencia"
-                );
+                $stmtUpd = $con->prepare("UPDATE asistencias SET hora_salida = ?, horas_turno = ?, horas_turno_minimo = ? WHERE id = ?");
+                $stmtUpd->bind_param("sdii", $hora_now, $horas_red, $min_horas_turno, $id_asistencia);
+                $stmtUpd->execute();
+                $stmtUpd->close();
 
                 if ($horas_diferencia >= $min_horas_turno) {
-                    if ($extras > 0) {
-                        $mensaje = "SALIDA registrada para: " . $bombero['nombre'] . " (turno completo + horas extra)";
-                        $tipo_alerta = "success";
-                        $detalle =
-                            "Mínimo: {$min_horas_turno} h | Trabajadas: {$horas_red} h | Extras: {$extras} h. " .
-                            "Entrada: " . substr($hora_entrada, 0, 5) .
-                            " | Salida: " . substr($hora_now, 0, 5);
-                    } else {
-                        $mensaje = "SALIDA registrada para: " . $bombero['nombre'] . " (turno completo)";
-                        $tipo_alerta = "success";
-                        $detalle =
-                            "Mínimo: {$min_horas_turno} h | Trabajadas: {$horas_red} h. " .
-                            "Entrada: " . substr($hora_entrada, 0, 5) .
-                            " | Salida: " . substr($hora_now, 0, 5);
-                    }
+                    $mensaje     = "SALIDA para: " . $bombero['nombre'] . ($extras > 0 ? " (+ horas extra)" : " (turno completo)");
+                    $tipo_alerta = "success";
+                    $detalle     = "Mínimo: {$min_horas_turno} h | Trabajadas: {$horas_red} h" . ($extras > 0 ? " | Extras: {$extras} h" : "")
+                                 . " | Entrada: " . substr($hora_entrada, 0, 5) . " | Salida: " . substr($hora_now, 0, 5);
                 } else {
-                    $faltan = round($min_horas_turno - $horas_diferencia, 2);
-                    $mensaje = "SALIDA registrada con AVISO para: " . $bombero['nombre'];
+                    $faltan      = round($min_horas_turno - $horas_diferencia, 2);
+                    $mensaje     = "SALIDA con AVISO para: " . $bombero['nombre'];
                     $tipo_alerta = "warning";
-                    $detalle =
-                        "Mínimo: {$min_horas_turno} h | Trabajadas: {$horas_red} h (faltaron {$faltan} h). " .
-                        "Entrada: " . substr($hora_entrada, 0, 5) .
-                        " | Salida: " . substr($hora_now, 0, 5);
+                    $detalle     = "Mínimo: {$min_horas_turno} h | Trabajadas: {$horas_red} h (faltaron {$faltan} h)"
+                                 . " | Entrada: " . substr($hora_entrada, 0, 5) . " | Salida: " . substr($hora_now, 0, 5);
                 }
 
             } else {
-                // Ya tenía salida
-                $mensaje = "Turno ya completado hoy para: " . $bombero['nombre'];
+                $mensaje     = "Turno ya completado hoy para: " . $bombero['nombre'];
                 $tipo_alerta = "secondary";
-                $detalle = "Entrada: " . substr($asis['hora_entrada'], 0, 5) .
-                           " | Salida: " . substr($asis['hora_salida'], 0, 5) .
-                           (!is_null($asis['horas_turno']) ? " | Horas: " . $asis['horas_turno'] . " h" : "") .
-                           " | Mínimo: " . ($asis['horas_turno_minimo'] ?? $min_horas_turno) . " h";
+                $detalle     = "Entrada: " . substr($asis['hora_entrada'], 0, 5)
+                             . " | Salida: " . substr($asis['hora_salida'], 0, 5)
+                             . (!is_null($asis['horas_turno']) ? " | Horas: " . $asis['horas_turno'] . " h" : "")
+                             . " | Mínimo: " . ($asis['horas_turno_minimo'] ?? $min_horas_turno) . " h";
             }
         }
     } else {
-        $mensaje = "Tarjeta no registrada: " . $rfid;
+        $mensaje     = "Tarjeta no registrada: " . htmlspecialchars($rfid);
         $tipo_alerta = "danger";
     }
 }
+
+require_once "../includes/header.php";
 ?>
 
 <div class="row justify-content-center">

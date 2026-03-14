@@ -2,57 +2,37 @@
 $pageTitle = "Registrar Novedad";
 require_once "../config/conexion.php";
 require_once "../includes/auth.php";
+require_modulo('novedades');
+validar_csrf();
 
-// Servicios recientes para elegir (opcional)
-$servicios = mysqli_query(
-    $con,
-    "SELECT s.id,
-            s.fecha_servicio,
-            s.descripcion,
-            u.nombre AS unidad
-     FROM servicios s
-     INNER JOIN unidades u ON u.id = s.unidad_id
-     ORDER BY s.fecha_servicio DESC, s.hora_reporte DESC
-     LIMIT 50"
-);
+$servicios = $con->query("SELECT s.id, s.fecha_servicio, s.descripcion, u.nombre AS unidad
+    FROM servicios s INNER JOIN unidades u ON u.id = s.unidad_id
+    ORDER BY s.fecha_servicio DESC, s.hora_reporte DESC LIMIT 50");
 
-// Unidades para novedad suelta
-$unidades = mysqli_query($con, "SELECT id, nombre FROM unidades ORDER BY nombre ASC");
+$unidades = $con->query("SELECT id, nombre FROM unidades ORDER BY nombre ASC");
 
-// Guardar
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $servicio_id = !empty($_POST['servicio_id']) ? (int) $_POST['servicio_id'] : "NULL";
-    $hora        = $_POST['hora'] ?: date('H:i:s');
-    $descripcion = mysqli_real_escape_string($con, $_POST['descripcion']);
+    $servicio_id = !empty($_POST['servicio_id']) ? (int)$_POST['servicio_id'] : null;
+    $hora        = trim($_POST['hora'] ?? '') ?: date('H:i:s');
+    $descripcion = trim($_POST['descripcion'] ?? '');
+    $unidad_id   = !empty($_POST['unidad_id'])  ? (int)$_POST['unidad_id']  : null;
+    $mando       = trim($_POST['mando'] ?? '');
+    $bomberos_n  = (isset($_POST['bomberos']) && $_POST['bomberos'] !== '') ? (int)$_POST['bomberos'] : null;
+    $calle       = trim($_POST['calle'] ?? '');
+    $cruce       = trim($_POST['cruce'] ?? '');
+    $colonia     = trim($_POST['colonia'] ?? '');
+    $municipio   = trim($_POST['municipio'] ?? '');
 
-    $unidad_id   = !empty($_POST['unidad_id']) ? (int) $_POST['unidad_id'] : "NULL";
-    $mando       = mysqli_real_escape_string($con, $_POST['mando']);
-    $bomberos    = $_POST['bomberos'] !== '' ? (int) $_POST['bomberos'] : "NULL";
-    $calle       = mysqli_real_escape_string($con, $_POST['calle']);
-    $cruce       = mysqli_real_escape_string($con, $_POST['cruce']);
-    $colonia     = mysqli_real_escape_string($con, $_POST['colonia']);
-    $municipio   = mysqli_real_escape_string($con, $_POST['municipio']);
+    $stmt = $con->prepare("INSERT INTO novedades (
+        servicio_id, hora, descripcion, unidad_id, mando, bomberos, calle, cruce, colonia, municipio
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("isisisisss",
+        $servicio_id, $hora, $descripcion, $unidad_id, $mando, $bomberos_n,
+        $calle, $cruce, $colonia, $municipio);
+    $stmt->execute();
+    $stmt->close();
 
-    $sql = "
-        INSERT INTO novedades (
-            servicio_id, hora, descripcion,
-            unidad_id, mando, bomberos,
-            calle, cruce, colonia, municipio
-        ) VALUES (
-            $servicio_id,
-            '$hora',
-            '$descripcion',
-            $unidad_id,
-            '$mando',
-            $bomberos,
-            '$calle',
-            '$cruce',
-            '$colonia',
-            '$municipio'
-        )
-    ";
-    mysqli_query($con, $sql);
-
+    set_flash('success', 'Novedad registrada correctamente.');
     header("Location: novedades.php");
     exit;
 }
@@ -66,6 +46,7 @@ require_once "../includes/header.php";
 </div>
 
 <form method="post" class="row g-3">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
 
     <!-- Asociar a un servicio (opcional) -->
     <div class="col-md-6">
