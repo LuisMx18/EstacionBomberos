@@ -56,7 +56,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['usuario_nombre']    = $row['nombre'];
                     $_SESSION['usuario_rol']       = $row['rol'];
                     $_SESSION['last_activity']     = time();
-                    $_SESSION['csrf_token']        = bin2hex(random_bytes(32));
+                    $_SESSION['csrf_token']        = function_exists('random_bytes')
+                        ? bin2hex(random_bytes(32))
+                        : bin2hex(openssl_random_pseudo_bytes(32));
 
                     // Redirigir según rol
                     if ($row['rol'] === 'Administrador') {
