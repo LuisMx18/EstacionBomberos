@@ -13,6 +13,7 @@ $unidades = $con->query("SELECT id, nombre FROM unidades ORDER BY nombre ASC");
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $servicio_id = !empty($_POST['servicio_id']) ? (int)$_POST['servicio_id'] : null;
+    $fecha       = trim($_POST['fecha'] ?? '') ?: date('Y-m-d');
     $hora        = trim($_POST['hora'] ?? '') ?: date('H:i:s');
     $descripcion = trim($_POST['descripcion'] ?? '');
     $unidad_id   = !empty($_POST['unidad_id'])  ? (int)$_POST['unidad_id']  : null;
@@ -24,10 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $municipio   = trim($_POST['municipio'] ?? '');
 
     $stmt = $con->prepare("INSERT INTO novedades (
-        servicio_id, hora, descripcion, unidad_id, mando, bomberos, calle, cruce, colonia, municipio
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("isisisisss",
-        $servicio_id, $hora, $descripcion, $unidad_id, $mando, $bomberos_n,
+        fecha, servicio_id, hora, descripcion, unidad_id, mando, bomberos, calle, cruce, colonia, municipio
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sisisisssss",
+        $fecha, $servicio_id, $hora, $descripcion, $unidad_id, $mando, $bomberos_n,
         $calle, $cruce, $colonia, $municipio);
     $stmt->execute();
     $stmt->close();
