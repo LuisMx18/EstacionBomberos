@@ -3,10 +3,10 @@
 // Para XAMPP local:
 //   $host = "localhost"; $user = "root"; $pass = ""; $db = "bomberos";
 // Para InfinityFree: cambia estos valores con los del panel de control
-$host = "localhost";
-$user = "root";
-$pass = "";
-$db   = "bomberos";
+    "sql311.infinityfree.com",   // host que te dieron
+    "if0_41390710",              // usuario de la BD
+    "9Zjr9WFEiKS3nCS",             // contraseña
+    "if0_41390710_bomberos"      // nombre de la BD
 
 mysqli_report(MYSQLI_REPORT_OFF); // Evita warnings en pantalla
 $con = new mysqli($host, $user, $pass, $db);
