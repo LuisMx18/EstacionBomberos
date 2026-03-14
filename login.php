@@ -13,7 +13,7 @@ if (empty($_SESSION['csrf_token'])) {
 if (isset($_SESSION['usuario_id'])) {
     $rol = $_SESSION['usuario_rol'] ?? '';
     if ($rol === 'Administrador') {
-        header("Location: crud/index.php");
+        header("Location: crud/dashboard.php");
     } else {
         header("Location: crud/asistencia.php");
     }
@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // Redirigir según rol
                     if ($row['rol'] === 'Administrador') {
-                        header("Location: crud/index.php");
+                        header("Location: crud/dashboard.php");
                     } else {
                         header("Location: crud/asistencia.php");
                     }

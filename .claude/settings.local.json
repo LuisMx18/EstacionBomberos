@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/xampp/htdocs/EstacionBomberos/.claude/worktrees/elegant-shaw -not -path */vendor/* -not -path */.git/* -type f)",
+      "Bash(grep -r \"CREATE TABLE\\\\|INSERT\\\\|SELECT\\\\|UPDATE\" /c/xampp/htdocs/EstacionBomberos/.claude/worktrees/elegant-shaw --include=*.php)",
+      "Bash(grep -r \"password_verify\\\\|mysqli_real_escape_string\\\\|htmlspecialchars\\\\|mysqli_prepare\\\\|prepared statement\" /c/xampp/htdocs/EstacionBomberos/.claude/worktrees/elegant-shaw/crud --include=*.php)",
+      "Bash(grep -l \"mysqli_query\\\\|INSERT\\\\|UPDATE\\\\|DELETE\" \"/c/xampp/htdocs/EstacionBomberos/.claude/worktrees/elegant-shaw/crud\"/*.php)"
+    ]
+  }
+}

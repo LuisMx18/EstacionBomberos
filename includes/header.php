@@ -257,6 +257,10 @@ $_active_page = basename($_SERVER['SCRIPT_FILENAME']);
         <?php endif; ?>
 
         <?php if (function_exists('puede_acceder') && puede_acceder('bomberos')): ?>
+        <a href="../crud/dashboard.php"
+           class="nav-link <?php echo $_active_page === 'dashboard.php' ? 'active' : ''; ?>">
+            <i class="bi bi-speedometer2"></i> Dashboard
+        </a>
         <a href="../crud/index.php"
            class="nav-link <?php echo in_array($_active_page, ['index.php','add.php','edit.php','show.php']) ? 'active' : ''; ?>">
             <i class="bi bi-people-fill"></i> Bomberos
