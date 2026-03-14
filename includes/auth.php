@@ -22,7 +22,9 @@ if (!isset($_SESSION['usuario_id'])) {
 
 // --- Token CSRF ---
 if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    $_SESSION['csrf_token'] = function_exists('random_bytes')
+        ? bin2hex(random_bytes(32))
+        : bin2hex(openssl_random_pseudo_bytes(32));
 }
 
 // --- Roles y permisos ---
