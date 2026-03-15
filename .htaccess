@@ -1,0 +1,22 @@
+# ── Seguridad básica ──────────────────────────────
+
+# Bloquear acceso directo a archivos sensibles
+<FilesMatch "\.(sql|log|md|json|toml|lock)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Bloquear acceso a carpetas del sistema
+RedirectMatch 403 ^/\.git
+RedirectMatch 403 ^/\.claude
+RedirectMatch 403 ^/vendor/autoload\.php$
+
+# Ocultar errores PHP al usuario
+php_flag display_errors off
+php_flag log_errors on
+
+# Charset UTF-8
+AddDefaultCharset UTF-8
+
+# Página de inicio por defecto
+DirectoryIndex index.php login.php

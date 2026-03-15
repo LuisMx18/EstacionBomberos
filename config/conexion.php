@@ -1,14 +1,22 @@
 <?php
-// ── Configuración de base de datos ──────────────────────────
-// Railway inyecta las variables de entorno automáticamente.
-// Para XAMPP local define las variables en tu entorno o déjalas con los defaults.
+// ══════════════════════════════════════════════
+//  CONFIGURACIÓN DE BASE DE DATOS
+//  Cambia estos 4 valores con los de tu hosting
+// ══════════════════════════════════════════════
+$host = 'localhost';               // En 000webhost siempre es localhost
+$user = 'TU_USUARIO_BD';           // Ej: id123456789_bomberos
+$pass = 'TU_CONTRASEÑA_BD';        // La que creaste en el panel
+$db   = 'TU_NOMBRE_BD';            // Ej: id123456789_bomberos
+$port = 3306;
 
-$host = getenv('MYSQLHOST')     ?: 'localhost';
-$user = getenv('MYSQLUSER')     ?: 'root';
-$pass = getenv('MYSQLPASSWORD') ?: '';
-$db   = getenv('MYSQLDATABASE') ?: 'bomberos';
-$port = (int)(getenv('MYSQLPORT') ?: 3306);
+// ── Soporte para Railway (variables de entorno) ──
+if (getenv('MYSQLHOST'))     $host = getenv('MYSQLHOST');
+if (getenv('MYSQLUSER'))     $user = getenv('MYSQLUSER');
+if (getenv('MYSQLPASSWORD')) $pass = getenv('MYSQLPASSWORD');
+if (getenv('MYSQLDATABASE')) $db   = getenv('MYSQLDATABASE');
+if (getenv('MYSQLPORT'))     $port = (int) getenv('MYSQLPORT');
 
+// ─────────────────────────────────────────────
 mysqli_report(MYSQLI_REPORT_OFF);
 $con = new mysqli($host, $user, $pass, $db, $port);
 
